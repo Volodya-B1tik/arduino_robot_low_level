@@ -1,6 +1,6 @@
-#include "pinots.h"
-#include <Wire.h>                     
-#include <Adafruit_PWMServoDriver.h>  
+#include "pin_joy.h"
+#include <Wire.h>                     // Подключаем библиотеку Wire
+#include <Adafruit_PWMServoDriver.h>  // Подключаем библиотеку Adafruit_PWMServoDriver
 #include <ros.h>
 #include <sensor_msgs/Joy.h>
 
@@ -42,7 +42,7 @@ void loop()
 {
   nh.spinOnce();
 
-  if (gototh == 8)
+  if (gototh == 8) //Вперед
    {
     pwm.setPWM(EnA, 1, 4095);
     pwm.setPWM(In_1, 1, 4095);
@@ -52,7 +52,7 @@ void loop()
     pwm.setPWM(EnB, 1, 4095);
   }
 
-  if (gototh == 5) 
+  if (gototh == 5)  // Стоп
   {
     pwm.setPWM(EnA, 0, 0);
     pwm.setPWM(In_1, 0, 0);
@@ -62,33 +62,33 @@ void loop()
     pwm.setPWM(EnB, 0, 0);
   }
 
-  if (gototh == 6) 
+  if (gototh == 4) // Влево
   {
     pwm.setPWM(EnA, 1, 4095);
-    pwm.setPWM(In_1, 0, 1);
-    pwm.setPWM(In_2, 1, 0);
-    pwm.setPWM(In_3, 0, 1);
-    pwm.setPWM(In_4, 1, 0);
+    pwm.setPWM(In_1, 1, 4095);
+    pwm.setPWM(In_2, 4095, 1);
+    pwm.setPWM(In_3, 1, 4095);
+    pwm.setPWM(In_4, 4095, 1);
     pwm.setPWM(EnB, 1, 4095);
   }
 
-  if (gototh == 4) 
+  if (gototh == 6) // Вправо
   {
     pwm.setPWM(EnA, 1, 4095);
-    pwm.setPWM(In_1, 1, 0);
-    pwm.setPWM(In_2, 0, 1);
-    pwm.setPWM(In_3, 1, 0);
-    pwm.setPWM(In_4, 0, 1);
+    pwm.setPWM(In_1, 4095, 1);
+    pwm.setPWM(In_2, 1, 4095);
+    pwm.setPWM(In_3, 4095, 1);
+    pwm.setPWM(In_4, 1, 4095);
     pwm.setPWM(EnB, 1, 4095);
   }
 
-  if (gototh == 2)
+  if (gototh == 2) // Назад
    {
     pwm.setPWM(EnA, 1, 4095);
-    pwm.setPWM(In_1, 0, 1);
-    pwm.setPWM(In_2, 1, 0);
-    pwm.setPWM(In_3, 1, 0);
-    pwm.setPWM(In_4, 0, 1);
-    pwm.setPWM(EnB, 1, 4000);
+    pwm.setPWM(In_1, 4095, 1);
+    pwm.setPWM(In_2, 1, 4095);
+    pwm.setPWM(In_3, 1, 4095);
+    pwm.setPWM(In_4, 4095, 1);
+    pwm.setPWM(EnB, 1, 4095);
   }
 }
