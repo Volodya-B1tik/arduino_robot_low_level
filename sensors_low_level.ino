@@ -17,18 +17,18 @@ ros::NodeHandle nh;
 
 geometry_msgs::Vector3 sonar_msg;
 std_msgs::Float32 enco_left;
+std_msgs::Float32 enco_right;
 sensor_msgs::Imu Imu_msg;
 ros::Publisher imu_pub("imu/data", &Imu_msg);
-ros::Publisher enco("enco", &enco_left);
+ros::Publisher lwheel("lwheel", &enco_left);
+ros::Publisher rwheel("rwheel", &enco_right);
 ros::Publisher sonar("sonar", &sonar_msg);
 
 Thread LeftThread = Thread();
 Thread Midhread = Thread();
 Thread RightThread = Thread();
-Thread Encoders_right = Thread();
 Thread IMU = Thread();
 
-RotaryEncoder encoder(inA1, inB1);
 
 void imu_data(int16_t *gyro, int16_t *accel, int32_t *quat) {
   Quaternion q;
@@ -61,7 +61,8 @@ void setup() {
 
   nh.initNode();
   nh.advertise(sonar);
-  nh.advertise(enco);
+  nh.advertise(lwheel);
+  nh.advertise(rwheel);
   nh.advertise(imu_pub);
   nh.getHardware()->setBaud(115200);
 
@@ -83,13 +84,21 @@ void setup() {
   IMU.onRun(imu_data);
   IMU.setInterval(10000);
 
-  Encoders_right.onRun(Enco_right);
-  Encoders_right.setInterval(10);
 
-  pinMode(inA1, INPUT);             // Пины в режим приема INPUT
-  pinMode(inB1, INPUT);             // Пины в режим приема INPUT
-  attachInterrupt(0, A_1, CHANGE);  // Настраиваем обработчик прерываний по изменению сигнала
-  attachInterrupt(1, B_1, CHANGE);  // Настраиваем обработчик прерываний по изменению сигнала
+    pinMode(ENC_A_l, INPUT);
+    pinMode(ENC_B_l, INPUT);
+    pinMode(ENC_A_r, INPUT);
+    pinMode(ENC_B_r, INPUT); 
+
+    state_a_l = (boolean) digitalRead(ENC_A_l);
+    state_b_l = (boolean) digitalRead(ENC_B_l);
+    state_a_r = (boolean) digitalRead(ENC_A_r);
+    state_b_r = (boolean) digitalRead(ENC_B_r);
+
+    attachInterrupt(4, interrupt_enc_a_l, CHANGE);
+    attachInterrupt(5, interrupt_enc_b_l, CHANGE);
+    attachInterrupt(0, interrupt_enc_a_r, CHANGE);
+    attachInterrupt(1, interrupt_enc_b_r, CHANGE);  
 
   //Serial.begin(9600);
   pinMode(trigPin_left, OUTPUT);
@@ -125,16 +134,18 @@ void loop() {
   sonar_msg.z = right;
   sonar.publish(&sonar_msg);
 
-  if (Encoders_right.shouldRun())
-    Encoders_right.run();
+    enc_pos_change_l = enc_pos_l - enc_pos_prev_l;
+    enc_pos_change_l = abs(enc_pos_change_l);
+    enc_pos_change_r = enc_pos_r - enc_pos_prev_r;
+    enc_pos_change_r = abs(enc_pos_change_r);
 
-  if (actualcount != count) {  // Чтобы не загружать ненужным выводом в Serial, выводим состояние
-    actualcount = count;
-    //count=count/80;               // счетчика только в момент изменения
-    enco_left.data = count / 80;
-    enco.publish(&enco_left);
-    //
-  }
+    enco_left.data = enc_pos_l;
+    lwheel.publish(&enco_left);
+    enco_right.data = enc_pos_r;
+    rwheel.publish(&enco_right);
+
+    enc_pos_prev_l = enc_pos_l;
+    enc_pos_prev_r = enc_pos_r;
 
   nh.spinOnce();
 }
@@ -200,68 +211,29 @@ void Right() {
     right = 200;
 }
 
-void A_1() {
-  if (micros() - lastTurn < pause) return;  // Если с момента последнего изменения состояния не прошло
-  // достаточно времени - выходим из прерывания
-  inA1Value = digitalRead(inA1);  // Получаем состояние пинов A и B
-  inB1Value = digitalRead(inB1);
-
-  cli();  // Запрещаем обработку прерываний, чтобы не отвлекаться
-  if (state == 0 && !inA1Value && inB1Value || state == 2 && inA1Value && !inB1Value) {
-    state += 1;  // Если выполняется условие, наращиваем переменную state
-    lastTurn = micros();
-  }
-  if (state == -1 && !inA1Value && !inB1Value || state == -3 && inA1Value && inB1Value) {
-    state -= 1;  // Если выполняется условие, наращиваем в минус переменную state
-    lastTurn = micros();
-  }
-  setCount(state);  // Проверяем не было ли полного шага из 4 изменений сигналов (2 импульсов)
-  sei();            // Разрешаем обработку прерываний
-
-  if (inA1Value && inB1Value && state != 0) state = 0;  // Если что-то пошло не так, возвращаем статус в исходное состояние
-}
-void B_1() {
-  if (micros() - lastTurn < pause) return;
-  inA1Value = digitalRead(inA1);
-  inB1Value = digitalRead(inB1);
-
-  cli();
-  if (state == 1 && !inA1Value && !inB1Value || state == 3 && inA1Value && inB1Value) {
-    state += 1;  // Если выполняется условие, наращиваем переменную state
-    lastTurn = micros();
-  }
-  if (state == 0 && inA1Value && !inB1Value || state == -2 && !inA1Value && inB1Value) {
-    state -= 1;  // Если выполняется условие, наращиваем в минус переменную state
-    lastTurn = micros();
-  }
-  setCount(state);  // Проверяем не было ли полного шага из 4 изменений сигналов (2 импульсов)
-  sei();
-
-  if (inA1Value && inB1Value && state != 0) state = 0;  // Если что-то пошло не так, возвращаем статус в исходное состояние
-}
-
-void setCount(int state) {          // Устанавливаем значение счетчика
-  if (state == 4 || state == -4) {  // Если переменная state приняла заданное значение приращения
-    count += (int)(state / 4);      // Увеличиваем/уменьшаем счетчик
-    lastTurn = micros();            // Запоминаем последнее изменение
-  }
-}
-
-void Enco_right() {
-
-  current_state_right = digitalRead(inB);
-  if (current_state_right != pre_state_right) {
-    if (digitalRead(inA) > pre_state_right) {
-      counter_right++;
-      Serial.print("Value_Right: ");
-      Serial.println(counter_right);
-      pre_state_right = current_state_right;
+void interrupt_enc_a_l()
+{
+    if (!state_a_l) {
+        state_b_l ? enc_pos_l++: enc_pos_l--;         
     }
-    if (digitalRead(inA) < pre_state_right) {
-      counter_right--;
-      Serial.print("Value_Right: ");
-      Serial.println(counter_right);
-      pre_state_right = current_state_right;
-    }
-  }
+    state_a_l = !state_a_l;
 }
+
+void interrupt_enc_b_l()  
+{
+    state_b_l = !state_b_l;
+}
+
+void interrupt_enc_a_r()
+{
+    if (!state_a_r) {
+        state_b_r ? enc_pos_r++: enc_pos_r--;         
+    }
+    state_a_r = !state_a_r;
+}
+
+void interrupt_enc_b_r()  
+{
+    state_b_r = !state_b_r;
+}
+
